@@ -1,0 +1,5 @@
+POST www.myweb.org HTTP/1.0
+status: val
+
+body
+

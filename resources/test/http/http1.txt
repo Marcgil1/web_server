@@ -1,0 +1,7 @@
+GET website.h.com HTTP/1.1
+status1: val1
+status2: val2
+
+body body body
+more body
+
