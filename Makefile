@@ -47,8 +47,9 @@ stop:
 
 clean:
 	@echo "Cleaning the build..."
-	rm $(DIRB)main.out
-	rm $(DIRO)*.o
+	if [ -f $(DIRB)main.out ];      then rm $(DIRB)main.out; fi
+	if [ -f $(DIRB)http.test.out ]; then rm $(DIRB)http.test.out; fi
+	if [ -f $(DIRO)*.o ];           then rm $(DIRO)*.o; fi
 
 
 
