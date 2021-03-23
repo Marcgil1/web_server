@@ -1,5 +1,6 @@
 #include "http/http.h"
 
+#include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -249,22 +250,233 @@ int __read_body(char* buffer, http_req_t* msg, http_error_t* err) {
     
     len = strlen(buffer);
 
-    msg->body = malloc(len * sizeof(char));
+    msg->body = malloc((len+1) * sizeof(char));
     if (msg->body == NULL) {
         *err = SYSTEM_ERROR;
         return -1;
     }
 
     strcpy(msg->body, buffer);
+    msg->body[len] = '\0';
+
+    return len;
 }
 
 http_res_t* http_read_response(int fd, http_error_t* error) {
     return NULL;
 }
+int http_write_request(int fd, http_req_t* msg, http_error_t* error) {
+    return 0;
+}
+
+int http_write_response(int fd, http_res_t* msg, http_error_t* error) {
+    char* raw;
+    size_t len;
+    size_t aux;
+    size_t written;
+
+    raw = http_response_to_string(msg);
+    if (raw == NULL) {
+        *error = SYSTEM_ERROR;
+        return 1;
+    }
+
+    len = strlen(raw);
+    written = 0;
+    while (written != len) {
+        aux = write(fd, raw + written, len - written);
+
+        if (aux == -1) {
+            *error = SYSTEM_ERROR;
+            return 1;
+        } else {
+            written += aux;
+        }
+    }
+
+    return 0;
+}
+
+http_header_t* http_new_headers(
+    unsigned num_headers, ...)
+{
+    http_header_t* headers;
+    char* string;
+    size_t len;
+    va_list ap;
+    size_t idx;
+
+    headers = malloc(MAX_HEADERS * sizeof(http_header_t));
+    if (headers == NULL) {
+        return NULL;
+    }
+    
+    va_start(ap, num_headers);
+    for (idx = 0; idx < num_headers; idx++) {
+        string                  = va_arg(ap, char*);
+        len                     = strlen(string) + 1;
+        headers[idx].field_name = malloc(len * sizeof(char));
+        if (headers[idx].field_name == NULL) {
+            return NULL;
+        }
+        strcpy(headers[idx].field_name, string);
+
+        string             = va_arg(ap, char*);
+        len                = strlen(string) + 1;
+        headers[idx].value = malloc(len * sizeof(char));
+        if (headers[idx].field_name == NULL) {
+            return NULL;
+        }
+        strcpy(headers[idx].value, string);
+    }
+    va_end(ap);
+
+    return headers;
+}
+
+http_req_t* http_new_request(
+    http_method_t  method,
+    char*          url,
+    char*          version,
+    unsigned       num_headers,
+    http_header_t* headers,
+    char*          body)
+{
+    return NULL;
+}
+
+http_res_t* http_new_response(
+    char*          version,
+    unsigned       status_code,
+    char*          phrase,
+    unsigned       num_headers,
+    http_header_t* headers,
+    char*          body)
+{
+    http_res_t* msg;
+
+    msg = malloc(sizeof(http_res_t));
+    if (msg == NULL) {
+        return NULL;
+    }
+
+    msg->version = malloc((strlen(version) + 1) * sizeof(char));
+    if (msg->version == NULL) {
+        http_drop_response(msg);
+        return NULL;
+    }
+    strcpy(msg->version, version);
+    
+    msg->status_code = status_code;
+
+    msg->phrase = malloc((strlen(version) + 1) * sizeof(char));
+    if (msg->phrase == NULL) {
+        http_drop_response(msg);
+        return NULL;
+    }
+    strcpy(msg->phrase, phrase);
+    
+    msg->num_headers = num_headers;
+    msg->headers = headers;
+
+    msg->body = malloc((strlen(body) + 1) * sizeof(char));
+    if (msg->body == NULL) {
+        http_drop_response(msg);
+        return NULL;
+    }
+    strcpy(msg->body, body);
+
+    return msg;
+}
+
+void __http_drop_headers(unsigned num_headers, http_header_t* headers) {
+    for (int i = 0; i < num_headers; i++) {
+        free(headers[i].field_name);
+        free(headers[i].value);
+    }
+    free(headers);
+}
+
+size_t __get_raw_response_size(http_res_t* msg) {
+    size_t size;
+    unsigned status_code;
+
+    status_code = msg->status_code;
+    size = 0;
+    size += strlen(msg->version);
+    size += 1; // Space.
+    while (status_code > 0) {
+        status_code /= 10;
+        size += 1;
+    }
+    size += 1; // Space.
+    size += strlen(msg->phrase);
+    size += 2; // '\r\n'
+    for (int i = 0; i < msg->num_headers; i++) {
+        size += strlen(msg->headers[i].field_name);
+        size += 2; // ': '
+        size += strlen(msg->headers[i].value);
+        size += 2; // '\r\n'
+    }
+    size += 2; // '\r\n'
+    size += strlen(msg->body);
+    size += 1; // '\0'
+
+    return size;
+}
+
+char* http_response_to_string(http_res_t* msg) {
+    size_t buff_len = 128;
+    char buff[buff_len];
+    char* raw;
+    size_t len;
+    size_t idx;
+
+    len = __get_raw_response_size(msg);
+    
+    raw = malloc(len * sizeof(char));
+    if (raw == NULL) {
+        return NULL;
+    }
+    memset(raw, 0, len);
+    memset(buff, 0, buff_len);
+
+    strcat(raw, msg->version);
+    strcat(raw, " ");
+    snprintf(buff, buff_len, "%u", msg->status_code);
+    strcat(raw, buff);
+    strcat(raw, " ");
+    strcat(raw, msg->phrase);
+    strcat(raw, "\r\n");
+    for (int i = 0; i < msg->num_headers; i++) {
+        strcat(raw, msg->headers[i].field_name);
+        strcat(raw, ": ");
+        strcat(raw, msg->headers[i].value);
+        strcat(raw, "\r\n");
+    }
+    strcat(raw, "\r\n");
+    strcat(raw, msg->body);
+
+    return raw;
+}
+
+char* http_request_to_string(http_req_t* msg) {
+    return NULL;
+}
 
 void http_drop_request(http_req_t* msg) {
+    free(msg->url);
+    free(msg->version);
+    __http_drop_headers(msg->num_headers, msg->headers);
+    free(msg->body);
+    free(msg);
 }
 
 void http_drop_response(http_res_t* msg) {
+    free(msg->version);
+    free(msg->phrase);
+    __http_drop_headers(msg->num_headers, msg->headers);
+    free(msg->body);
+    free(msg);
 }
 
