@@ -348,7 +348,20 @@ http_req_t* http_new_request(
     http_header_t* headers,
     char*          body)
 {
-    return NULL;
+    http_req_t* msg;
+
+    msg = malloc(sizeof(http_req_t));
+    if (msg == NULL) {
+        return NULL;
+    }
+
+    msg->method      = method;
+    msg->url         = strdup(url);
+    msg->version     = strdup(version);
+    msg->num_headers = num_headers;
+    msg->body        = strdup(body);
+
+    return msg;
 }
 
 http_res_t* http_new_response(
@@ -366,31 +379,12 @@ http_res_t* http_new_response(
         return NULL;
     }
 
-    msg->version = malloc((strlen(version) + 1) * sizeof(char));
-    if (msg->version == NULL) {
-        http_drop_response(msg);
-        return NULL;
-    }
-    strcpy(msg->version, version);
-    
+    msg->version     = strdup(version);
     msg->status_code = status_code;
-
-    msg->phrase = malloc((strlen(version) + 1) * sizeof(char));
-    if (msg->phrase == NULL) {
-        http_drop_response(msg);
-        return NULL;
-    }
-    strcpy(msg->phrase, phrase);
-    
+    msg->phrase      = strdup(phrase);
     msg->num_headers = num_headers;
-    msg->headers = headers;
-
-    msg->body = malloc((strlen(body) + 1) * sizeof(char));
-    if (msg->body == NULL) {
-        http_drop_response(msg);
-        return NULL;
-    }
-    strcpy(msg->body, body);
+    msg->headers     = headers;
+    msg->body        = strdup(body);
 
     return msg;
 }
@@ -469,6 +463,26 @@ char* http_response_to_string(http_res_t* msg) {
 char* http_request_to_string(http_req_t* msg) {
     return NULL;
 }
+
+char* http_get_cookie(http_req_t* msg, char* cookie) {
+    if (msg == NULL) {
+        return NULL;
+    }
+    for (size_t i = 0; i < msg->num_headers; i++) {
+        char* idx;
+        if (strcmp(msg->headers[i].field_name, "Cookie") != 0)
+            continue;
+        if (strstr(msg->headers[i].value, cookie) != msg->headers[i].value)
+            continue;
+        if (msg->headers[i].value + strlen(cookie) != (idx = strchr(msg->headers[i].value, '=')))
+            continue;
+        // Important! Right now, we DO NOT support expires/date/secure
+        return strdup(idx + 1);
+    }
+
+    return NULL;
+}
+
 
 void http_drop_request(http_req_t* msg) {
     free(msg->url);

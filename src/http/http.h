@@ -66,6 +66,8 @@ http_res_t* http_new_response(
 char* http_request_to_string(http_req_t* msg);
 char* http_response_to_string(http_res_t* msg);
 
+char* http_get_cookie(http_req_t* msg, char* cookie);
+
 void http_drop_request(http_req_t* msg);
 void http_drop_response(http_res_t* msg);
 

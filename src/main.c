@@ -100,46 +100,65 @@ void process_web_request(int fd)
             http_write_response(fd, res, &err);
         } else {
             debug(LOG, "request", "Legitimate request", fd);
-            res = http_new_response("HTTP/1.1", 200, "OK",
-                                    1, http_new_headers(1,
-                                        "Connection", "close"),
-                                    "");
-            int file_fd = open(url + 1, O_RDONLY, S_IRUSR);
-            if (file_fd == -1) {
-                debug(ERROR, "could not read file", url, fd);
-                close(fd);
-                exit(1);
+            char* num_visits_str = http_get_cookie(req, "cookie_count");
+            unsigned long num_visits = 1;
+            if (num_visits_str == NULL || (num_visits = strtoul(num_visits_str, NULL, 10)) < 10 + 1) {
+                free(num_visits_str);
+                char* new_cookie_count = malloc((13 + 4 + 1) * sizeof(char));
+                if (new_cookie_count == NULL) {
+                    debug(ERROR, "memory error", url, fd);
+                    close(fd);
+                    exit(1);
+                }
+                sprintf(new_cookie_count, "cookie_count=%lu", num_visits + 1);
+                res = http_new_response("HTTP/1.1", 200, "OK",
+                        2, http_new_headers(2,
+                            "Connection", "close",
+                            "Set-Cookie", new_cookie_count),
+                        "");
+                free(new_cookie_count);
+                int file_fd = open(url + 1, O_RDONLY, S_IRUSR);
+                if (file_fd == -1) {
+                    debug(ERROR, "could not read file", url, fd);
+                    close(fd);
+                    exit(1);
+                }
+
+                http_write_response(fd, res, &err);
+                ssize_t bytes_sent = 0;
+                off_t offset = 0;
+                do {
+                    bytes_sent = sendfile(fd, file_fd, &offset, 8000);
+                } while (bytes_sent > 0);
+                close(file_fd);
+            } else {
+                res = http_new_response("HTTP/1.1", 200, "OK",
+                        1, http_new_headers(1,
+                            "Connection", "close"),
+                        "");
+                int file_fd = open("error.html", O_RDONLY, S_IRUSR);
+                if (file_fd == -1) {
+                    debug(ERROR, "could not read file", url, fd);
+                    close(fd);
+                    exit(1);
+                }
+
+                http_write_response(fd, res, &err);
+                ssize_t bytes_sent = 0;
+                off_t offset = 0;
+                do {
+                    bytes_sent = sendfile(fd, file_fd, &offset, 8000);
+                } while (bytes_sent > 0);
+                close(file_fd);
             }
 
-            http_write_response(fd, res, &err);
-            ssize_t bytes_sent = 0;
-            off_t offset = 0;
-            do {
-                bytes_sent = sendfile(fd, file_fd, &offset, 8000);
-            } while (bytes_sent > 0);
-            close(file_fd);
         }
     }
 
-/*
-    http_res_t* res = http_new_response("HTTP/1.1", 200, "OK",
-                                        1, http_new_headers(1,
-                                            "Connection", "close"),
-                                        "<html><head><title>HI!</title></head><body>The resource you asked for could not be found :(</body></html>");
-    http_write_response(fd, res, &err);
- */   
     http_drop_request(req);
     http_drop_response(res);
-	//
-	//	Como se trata el caso excepcional de la URL que no apunta a ningún fichero
-	//	html
-	//
 	//	Evaluar el tipo de fichero que se está solicitando, y actuar en
 	//	consecuencia devolviendolo si se soporta u devolviendo el error correspondiente en otro caso
-	//
-	//	En caso de que el fichero sea soportado, exista, etc. se envia el fichero con la cabecera
-	//	correspondiente, y el envio del fichero se hace en blockes de un máximo de  8kB
-	//
 	
     debug(LOG, "request", "Finished processing request", fd);
 	close(fd);
