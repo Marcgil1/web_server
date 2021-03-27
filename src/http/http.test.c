@@ -173,6 +173,7 @@ void test_can_read_three_status_lines() {
     TEST_ASSERT_EQUAL_STRING("3", header[2].value);
 }
 
+/*
 void test_can_read_complete_request() {
     int fd;
     http_req_t* msg;
@@ -196,6 +197,7 @@ void test_can_read_complete_request() {
 
     close(fd);
 }
+*/
 
 void test_can_define_headers1() {
     http_header_t* headers;
@@ -340,7 +342,7 @@ int main() {
     RUN_TEST(test_can_read_several_status_lines);
     RUN_TEST(test_detects_error_on_ill_formed_status_line);
     RUN_TEST(test_can_read_three_status_lines);
-    RUN_TEST(test_can_read_complete_request);
+//    RUN_TEST(test_can_read_complete_request);
     RUN_TEST(test_can_define_headers1);
     RUN_TEST(test_can_define_headers2);
     RUN_TEST(test_can_define_response1);

@@ -1,8 +1,11 @@
 #include "http/http.h"
 
+#include <sys/types.h>
+#include <sys/socket.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
@@ -27,10 +30,12 @@ http_req_t* http_read_request(int fd, http_error_t* error) {
         *error = SYSTEM_ERROR;
         return NULL;
     }
-
+/*
     while ((bytes_read = read(fd, buffer + readsize, BUFSIZE - readsize)) > 0) {
         readsize += bytes_read;
     }
+*/
+    bytes_read = recv(fd, buffer, BUFSIZE, 0);
 
     if (bytes_read == -1) {
         *error = FD_NOT_AVAILABLE;
@@ -48,7 +53,7 @@ http_req_t* http_read_request(int fd, http_error_t* error) {
     start += ret;
     ret = __read_headers(buffer + start, &(msg->headers), &(msg->num_headers), error);
     if (ret < 0) {
-        printf("!!! (%s) %d\n", buffer + start, ret);
+        //printf("!!! (%s) %d\n", buffer + start, ret);
         http_drop_request(msg);
         return NULL;
     }
@@ -185,7 +190,7 @@ int __read_headers(char* buffer, http_header_t** headers, unsigned* num_headers,
 
     regi = regcomp(
         &reg_header,
-        "^(([[:alnum:]]|-|_)+): (([[:alnum:]]|-|_|[[:punct:]])+)\r\n",
+        "^(([[:alnum:]]|-|_)+): (([[:print:]])+)\r\n",
         REG_EXTENDED);
     if (regi) {
         // Should never get here.
@@ -282,7 +287,8 @@ int http_write_response(int fd, http_res_t* msg, http_error_t* error) {
     }
 
     len = strlen(raw);
-    written = 0;
+    send(fd, raw, len, 0);
+/*    written = 0;
     while (written != len) {
         aux = write(fd, raw + written, len - written);
 
@@ -294,7 +300,7 @@ int http_write_response(int fd, http_res_t* msg, http_error_t* error) {
         }
     }
 
-    return 0;
+    return 0;*/
 }
 
 http_header_t* http_new_headers(

@@ -7,8 +7,9 @@ DIRU = lib/unity/src/
 .PHONY: build
 .PHONY: build_test
 .PHONY: test
-.PHONY: run
+.PHONY: start
 .PHONY: stop
+.PHONY: log
 .PHONY: clean
 
 $(DIRO)http.o:: $(DIRS)http/http.c
@@ -38,18 +39,25 @@ test: build_test
 	@echo "Running tests for http..."
 	$(DIRB)http.test.out
 
-run: $(DIRB)main.out
+start: $(DIRB)main.out
 	@echo "Running the project..."
-	$(DIRB)main.out
+	$(DIRB)main.out 8080 resources/web
 
 stop:
 	@echo "Stopping the program..."
+	killall main.out
+
+clean_log:
+	echo "" > resources/web/webserver.log
+
+log:
+	cat resources/web/webserver.log
 
 clean:
 	@echo "Cleaning the build..."
 	if [ -f $(DIRB)main.out ];      then rm $(DIRB)main.out; fi
 	if [ -f $(DIRB)http.test.out ]; then rm $(DIRB)http.test.out; fi
-	if [ -f $(DIRO)*.o ];           then rm $(DIRO)*.o; fi
+	rm $(DIRO)*.o
 
 
 
