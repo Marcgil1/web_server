@@ -4,6 +4,10 @@ DIRB = build/
 DIRR = resources/
 DIRU = lib/unity/src/
 
+COMPILE		 = gcc -I $(DIRS) -c
+COMPILE_TEST = gcc -I $(DIRS) -I $(DIRU) -c
+LINK         = gcc
+
 .PHONY: build
 .PHONY: build_test
 .PHONY: test
@@ -12,51 +16,79 @@ DIRU = lib/unity/src/
 .PHONY: log
 .PHONY: clean
 
+$(DIRO)cookie.o:: $(DIRS)http/cookie.c
+	$(COMPILE)      -o $(DIRO)cookie.o $(DIRS)http/cookie.c
+
+$(DIRO)cookie.test.o:: $(DIRS)http/cookie.test.c $(DIRS)http/cookie.c
+	$(COMPILE_TEST) -o $(DIRO)cookie.test.o $(DIRS)http/cookie.test.c
+
 $(DIRO)http.o:: $(DIRS)http/http.c
-	gcc -I $(DIRS) -c -o $(DIRO)http.o $(DIRS)http/http.c
+	$(COMPILE)      -o $(DIRO)http.o $(DIRS)http/http.c
 
 $(DIRO)http.test.o:: $(DIRS)http/http.test.c $(DIRS)http/http.c
-	gcc -I $(DIRS) -I $(DIRU) -c -o $(DIRO)http.test.o $(DIRS)http/http.test.c
+	$(COMPILE_TEST) -o $(DIRO)http.test.o $(DIRS)http/http.test.c
 
 $(DIRO)unity.o:: $(DIRU)unity.c
-	gcc -I $(DIRS) -I $(DIRU) -c -o $(DIRO)unity.o $(DIRU)unity.c
+	$(COMPILE_TEST) -o $(DIRO)unity.o $(DIRU)unity.c
 
 $(DIRO)main.o:: $(DIRS)main.c
-	gcc -I $(DIRS) -c -o $(DIRO)main.o $(DIRS)main.c
+	$(COMPILE)      -o $(DIRO)main.o $(DIRS)main.c
 
-$(DIRB)main.out: $(DIRO)main.o $(DIRO)http.o
-	gcc -o $(DIRB)main.out $(DIRO)main.o $(DIRO)http.o
+$(DIRB)main.out: $(DIRO)main.o $(DIRO)http.o $(DIRO)cookie.o
+	$(LINK)         -o $(DIRB)main.out $(DIRO)main.o $(DIRO)http.o $(DIRO)cookie.o
 
 
 
 build: $(DIRB)main.out
-	@echo "Building the project..."
+	@echo "-------------------------------------------------------------------"
+	@echo "-------- BUILD ----------------------------------------------------"
+	@echo "-------------------------------------------------------------------"
 
-build_test: $(DIRO)http.test.o $(DIRO)unity.o
-	gcc -o $(DIRB)http.test.out $(DIRO)http.test.o $(DIRO)unity.o
+build_test: $(DIRO)http.test.o $(DIRO)cookie.test.o $(DIRO)unity.o
+	gcc -o $(DIRB)http.test.out   $(DIRO)http.test.o   $(DIRO)unity.o
+	gcc -o $(DIRB)cookie.test.out $(DIRO)cookie.test.o $(DIRO)unity.o
 
 test: build_test
-	@echo "Running tests for http..."
+	@echo "-------------------------------------------------------------------"
+	@echo "-------- TEST: http/http ------------------------------------------"
+	@echo "-------------------------------------------------------------------"
 	$(DIRB)http.test.out
+	@echo "-------------------------------------------------------------------"
+	@echo "-------- TEST: http/cookie ----------------------------------------"
+	@echo "-------------------------------------------------------------------"
+	$(DIRB)cookie.test.out
 
 start: $(DIRB)main.out
-	@echo "Running the project..."
+	@echo "-------------------------------------------------------------------"
+	@echo "-------- CLEAN ----------------------------------------------------"
+	@echo "-------------------------------------------------------------------"
 	$(DIRB)main.out 8080 resources/web
 
 stop:
-	@echo "Stopping the program..."
+	@echo "-------------------------------------------------------------------"
+	@echo "-------- STOP -----------------------------------------------------"
+	@echo "-------------------------------------------------------------------"
 	killall main.out
 
 clean_log:
+	@echo "-------------------------------------------------------------------"
+	@echo "--------- CLEAN_LOG -----------------------------------------------"
+	@echo "-------------------------------------------------------------------"
 	echo "" > resources/web/webserver.log
 
 log:
+	@echo "-------------------------------------------------------------------"
+	@echo "--------- LOG -----------------------------------------------------"
+	@echo "-------------------------------------------------------------------"
 	cat resources/web/webserver.log
 
 clean:
-	@echo "Cleaning the build..."
-	if [ -f $(DIRB)main.out ];      then rm $(DIRB)main.out; fi
-	if [ -f $(DIRB)http.test.out ]; then rm $(DIRB)http.test.out; fi
+	@echo "-------------------------------------------------------------------"
+	@echo "--------- CLEAN_BUID ----------------------------------------------"
+	@echo "-------------------------------------------------------------------"
+	if [ -f $(DIRB)main.out ];        then rm $(DIRB)main.out; fi
+	if [ -f $(DIRB)http.test.out ];   then rm $(DIRB)http.test.out; fi
+	if [ -f $(DIRB)cookie.test.out ]; then rm $(DIRB)cookie.test.out; fi
 	rm $(DIRO)*.o
 
 
