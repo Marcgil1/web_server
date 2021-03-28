@@ -11,6 +11,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+#include "http/cookie.h"
 #include "http/http.h"
 
 #define VERSION		24
@@ -100,23 +101,29 @@ void process_web_request(int fd)
             http_write_response(fd, res, &err);
         } else {
             debug(LOG, "request", "Legitimate request", fd);
-            char* num_visits_str = http_get_cookie(req, "cookie_count");
-            unsigned long num_visits = 1;
-            if (num_visits_str == NULL || (num_visits = strtoul(num_visits_str, NULL, 10)) < 10 + 1) {
-                free(num_visits_str);
-                char* new_cookie_count = malloc((13 + 4 + 1) * sizeof(char));
-                if (new_cookie_count == NULL) {
-                    debug(ERROR, "memory error", url, fd);
-                    close(fd);
+            http_cookie_t* cookie = http_get_cookie(req, "cookie_counter");
+            if (cookie == NULL || atoi(cookie->value) < 10) {
+                char* new_counter = malloc(3);
+                if (new_counter == NULL) {
+                    debug(ERROR, "MemoryError", url, fd);
                     exit(1);
                 }
-                sprintf(new_cookie_count, "cookie_count=%lu", num_visits + 1);
+                debug(LOG, "Here", "...", fd);
+                sprintf(new_counter, "%d", (cookie == NULL) ? 1 : (atoi(cookie->value) + 1));
+                http_cookie_t* new_cookie = http_new_cookie(
+                        "cookie_counter", new_counter,
+                        1, 2*60);
+                char* new_cookie_str = http_cookie_to_string(new_cookie);
+                printf("(%s)\n", new_cookie_str);
                 res = http_new_response("HTTP/1.1", 200, "OK",
                         2, http_new_headers(2,
                             "Connection", "close",
-                            "Set-Cookie", new_cookie_count),
+                            "Set-Cookie", new_cookie_str),
                         "");
-                free(new_cookie_count);
+
+                free(new_cookie_str);
+                http_drop_cookie(new_cookie);
+                http_drop_cookie(cookie);
                 int file_fd = open(url + 1, O_RDONLY, S_IRUSR);
                 if (file_fd == -1) {
                     debug(ERROR, "could not read file", url, fd);

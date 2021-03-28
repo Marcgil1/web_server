@@ -337,11 +337,14 @@ void test_can_get_cookie1() {
                                        1, http_new_headers(1,
                                            "Cookie", "theme=dark"),
                                        "");
-    char* cookie = http_get_cookie(msg, "theme");
+    http_cookie_t* cookie = http_get_cookie(msg, "theme");
 
     TEST_ASSERT_NOT_NULL(cookie);
-    TEST_ASSERT_EQUAL_STRING("dark", cookie);
-    free(cookie);
+    TEST_ASSERT_EQUAL_STRING("theme", cookie->name);
+    TEST_ASSERT_EQUAL_STRING("dark",  cookie->value);
+    TEST_ASSERT_EQUAL_STRING(0,       cookie->max_age_def);
+
+    http_drop_cookie(cookie);
     http_drop_request(msg);
 }
 
@@ -352,15 +355,18 @@ void test_can_get_cookie2() {
                                            "Cookie", "theme=light",
                                            "Cookie", "token=1234"),
                                        "");
-    char* cookie1 = http_get_cookie(msg, "theme");
-    char* cookie2 = http_get_cookie(msg, "token");
+    http_cookie_t* cookie1 = http_get_cookie(msg, "theme");
+    http_cookie_t* cookie2 = http_get_cookie(msg, "token");
 
     TEST_ASSERT_NOT_NULL(cookie1);
     TEST_ASSERT_NOT_NULL(cookie2);
-    TEST_ASSERT_EQUAL_STRING("light", cookie1);
-    TEST_ASSERT_EQUAL_STRING("1234", cookie2);
-    free(cookie1);
-    free(cookie2);
+    TEST_ASSERT_EQUAL_STRING("theme", cookie1->name);
+    TEST_ASSERT_EQUAL_STRING("light", cookie1->value);
+    TEST_ASSERT_EQUAL_STRING("token", cookie2->name);
+    TEST_ASSERT_EQUAL_STRING("1234",  cookie2->value);
+
+    http_drop_cookie(cookie1);
+    http_drop_cookie(cookie2);
     http_drop_request(msg);
 }
 

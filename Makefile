@@ -6,7 +6,7 @@ DIRU = lib/unity/src/
 
 COMPILE		 = gcc -I $(DIRS) -c
 COMPILE_TEST = gcc -I $(DIRS) -I $(DIRU) -c
-LINK         = gcc
+LINK         = gcc 
 
 .PHONY: build
 .PHONY: build_test
@@ -35,7 +35,7 @@ $(DIRO)main.o:: $(DIRS)main.c
 	$(COMPILE)      -o $(DIRO)main.o $(DIRS)main.c
 
 $(DIRB)main.out: $(DIRO)main.o $(DIRO)http.o $(DIRO)cookie.o
-	$(LINK)         -o $(DIRB)main.out $(DIRO)main.o $(DIRO)http.o $(DIRO)cookie.o
+	$(LINK)         -o $(DIRB)main.out $(DIRO)main.o $(DIRO)http.o $(DIRO)cookie.o -lm 
 
 
 
@@ -44,9 +44,9 @@ build: $(DIRB)main.out
 	@echo "-------- BUILD ----------------------------------------------------"
 	@echo "-------------------------------------------------------------------"
 
-build_test: $(DIRO)http.test.o $(DIRO)cookie.test.o $(DIRO)unity.o
-	gcc -o $(DIRB)http.test.out   $(DIRO)http.test.o   $(DIRO)unity.o
-	gcc -o $(DIRB)cookie.test.out $(DIRO)cookie.test.o $(DIRO)unity.o
+build_test: $(DIRO)http.test.o $(DIRO)cookie.test.o $(DIRO)unity.o $(DIRO)cookie.o
+	$(LINK) -o $(DIRB)http.test.out   $(DIRO)http.test.o   $(DIRO)unity.o $(DIRO)cookie.o -lm
+	$(LINK) -o $(DIRB)cookie.test.out $(DIRO)cookie.test.o $(DIRO)unity.o -lm
 
 test: build_test
 	@echo "-------------------------------------------------------------------"

@@ -350,6 +350,10 @@ http_req_t* http_new_request(
 {
     http_req_t* msg;
 
+    if (url == NULL || version == NULL || headers == NULL || body == NULL) {
+        return NULL;
+    }
+
     msg = malloc(sizeof(http_req_t));
     if (msg == NULL) {
         return NULL;
@@ -374,6 +378,10 @@ http_res_t* http_new_response(
 {
     http_res_t* msg;
 
+    if (version == NULL || phrase == NULL || headers == NULL || body == NULL) {
+        return NULL;
+    }
+
     msg = malloc(sizeof(http_res_t));
     if (msg == NULL) {
         return NULL;
@@ -390,6 +398,10 @@ http_res_t* http_new_response(
 }
 
 void __http_drop_headers(unsigned num_headers, http_header_t* headers) {
+    if (headers == NULL) {
+        return;
+    }
+
     for (int i = 0; i < num_headers; i++) {
         free(headers[i].field_name);
         free(headers[i].value);
@@ -432,6 +444,10 @@ char* http_response_to_string(http_res_t* msg) {
     size_t len;
     size_t idx;
 
+    if (msg == NULL) {
+        return NULL;
+    }
+
     len = __get_raw_response_size(msg);
     
     raw = malloc(len * sizeof(char));
@@ -464,7 +480,7 @@ char* http_request_to_string(http_req_t* msg) {
     return NULL;
 }
 
-char* http_get_cookie(http_req_t* msg, char* cookie) {
+http_cookie_t* http_get_cookie(http_req_t* msg, char* cookie) {
     if (msg == NULL) {
         return NULL;
     }
@@ -476,8 +492,7 @@ char* http_get_cookie(http_req_t* msg, char* cookie) {
             continue;
         if (msg->headers[i].value + strlen(cookie) != (idx = strchr(msg->headers[i].value, '=')))
             continue;
-        // Important! Right now, we DO NOT support expires/date/secure
-        return strdup(idx + 1);
+        return http_string_to_cookie(msg->headers[i].value);
     }
 
     return NULL;
@@ -485,6 +500,10 @@ char* http_get_cookie(http_req_t* msg, char* cookie) {
 
 
 void http_drop_request(http_req_t* msg) {
+    if (msg == NULL) {
+        return;
+    }
+    
     free(msg->url);
     free(msg->version);
     __http_drop_headers(msg->num_headers, msg->headers);
@@ -493,6 +512,10 @@ void http_drop_request(http_req_t* msg) {
 }
 
 void http_drop_response(http_res_t* msg) {
+    if (msg == NULL) {
+        return;
+    }
+
     free(msg->version);
     free(msg->phrase);
     __http_drop_headers(msg->num_headers, msg->headers);

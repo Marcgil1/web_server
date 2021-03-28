@@ -1,5 +1,7 @@
 #pragma once
 
+#include "http/cookie.h"
+
 /* Maximum number of headers to be read */
 #define MAX_HEADERS 32
 
@@ -43,8 +45,8 @@ typedef enum _http_error_t {
 http_req_t* http_read_request(int fd, http_error_t* error);
 http_res_t* http_read_response(int fd, http_error_t* error);
 
-int http_write_request(int fd, http_req_t* msg, http_error_t* error);
-int http_write_response(int fd, http_res_t* msg, http_error_t* error);
+int         http_write_request(int fd, http_req_t* msg, http_error_t* error);
+int         http_write_response(int fd, http_res_t* msg, http_error_t* error);
 
 http_header_t* http_new_headers(
     unsigned num_headers, ...);
@@ -66,7 +68,7 @@ http_res_t* http_new_response(
 char* http_request_to_string(http_req_t* msg);
 char* http_response_to_string(http_res_t* msg);
 
-char* http_get_cookie(http_req_t* msg, char* cookie);
+http_cookie_t*  http_get_cookie(http_req_t* msg, char* cookie);
 
 void http_drop_request(http_req_t* msg);
 void http_drop_response(http_res_t* msg);
