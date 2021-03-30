@@ -114,7 +114,6 @@ void process_web_request(int fd)
                         "cookie_counter", new_counter,
                         1, 2*60);
                 char* new_cookie_str = http_cookie_to_string(new_cookie);
-                printf("(%s)\n", new_cookie_str);
                 res = http_new_response("HTTP/1.1", 200, "OK",
                         2, http_new_headers(2,
                             "Connection", "close",
@@ -168,12 +167,9 @@ void process_web_request(int fd)
 	//	consecuencia devolviendolo si se soporta u devolviendo el error correspondiente en otro caso
 	
     debug(LOG, "request", "Finished processing request", fd);
-	close(fd);
-	exit(1);
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
 	int i, port, pid, listenfd, socketfd;
 	socklen_t length;
 	static struct sockaddr_in cli_addr;		// static = Inicializado con ceros
@@ -228,7 +224,7 @@ int main(int argc, char **argv)
 	if( listen(listenfd,64) <0)
 		debug(ERROR,"system call","listen",0);
 	
-	while(1){
+	while (1) {
 		length = sizeof(cli_addr);
 		if((socketfd = accept(listenfd, (struct sockaddr *)&cli_addr, &length)) < 0)
 			debug(ERROR,"system call","accept",0);
@@ -237,8 +233,24 @@ int main(int argc, char **argv)
 		}
 		else {
 			if(pid == 0) { 	// Proceso hijo
-				(void)close(listenfd);
-				process_web_request(socketfd); // El hijo termina tras llamar a esta función
+                (void)close(listenfd);
+
+                fd_set read_fd;
+                struct timeval tv;
+
+                do  {
+                    debug(LOG, "taking use of persistent connections", "", 0);
+                    process_web_request(socketfd); // El hijo termina tras llamar a esta función
+
+                    FD_ZERO(&read_fd);
+                    FD_SET(socketfd, &read_fd);
+
+                    tv.tv_sec  = 5;
+                    tv.tv_usec = 0;
+                } while (select(1, &read_fd, NULL, NULL, &tv));
+
+                (void)close(socketfd);
+                (void)exit(0);
 			} else { 	// Proceso padre
 				(void)close(socketfd);
 			}

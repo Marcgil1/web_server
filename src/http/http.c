@@ -30,11 +30,7 @@ http_req_t* http_read_request(int fd, http_error_t* error) {
         *error = SYSTEM_ERROR;
         return NULL;
     }
-/*
-    while ((bytes_read = read(fd, buffer + readsize, BUFSIZE - readsize)) > 0) {
-        readsize += bytes_read;
-    }
-*/
+
     bytes_read = recv(fd, buffer, BUFSIZE, 0);
 
     if (bytes_read == -1) {
@@ -53,7 +49,6 @@ http_req_t* http_read_request(int fd, http_error_t* error) {
     start += ret;
     ret = __read_headers(buffer + start, &(msg->headers), &(msg->num_headers), error);
     if (ret < 0) {
-        //printf("!!! (%s) %d\n", buffer + start, ret);
         http_drop_request(msg);
         return NULL;
     }
@@ -66,13 +61,6 @@ http_req_t* http_read_request(int fd, http_error_t* error) {
     }
 
     return msg;
-    /*int regi = regcomp(
-        &reg_body,
-        "\r\n.*",
-        REG_EXTENDED);
-    if (regi) {
-        // Should never get here.
-    }*/
 }
 
 /*
