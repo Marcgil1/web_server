@@ -16,6 +16,9 @@ LINK         = gcc
 .PHONY: log
 .PHONY: clean
 
+$(DIRO)debug.o:: $(DIRS)dg/debug.c
+	$(COMPILE)      -o $(DIRO)debug.o $(DIRS)dg/debug.c
+
 $(DIRO)cookie.o:: $(DIRS)http/cookie.c
 	$(COMPILE)      -o $(DIRO)cookie.o $(DIRS)http/cookie.c
 
@@ -34,8 +37,8 @@ $(DIRO)unity.o:: $(DIRU)unity.c
 $(DIRO)main.o:: $(DIRS)main.c
 	$(COMPILE)      -o $(DIRO)main.o $(DIRS)main.c
 
-$(DIRB)main.out: $(DIRO)main.o $(DIRO)http.o $(DIRO)cookie.o
-	$(LINK)         -o $(DIRB)main.out $(DIRO)main.o $(DIRO)http.o $(DIRO)cookie.o -lm 
+$(DIRB)main.out: $(DIRO)main.o $(DIRO)http.o $(DIRO)cookie.o $(DIRO)debug.o
+	$(LINK)         -o $(DIRB)main.out $(DIRO)main.o $(DIRO)http.o $(DIRO)cookie.o $(DIRO)debug.o -lm 
 
 
 
