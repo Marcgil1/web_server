@@ -151,12 +151,15 @@ int main(int argc, char **argv) {
 	//  permisos para ser usado
 	//
     
+    if (!dg_open("resources/log/webserver.log")) {
+        (void)printf("ERROR: could not open log\n");
+        return -1;
+    }
 
 	if(chdir(argv[2]) == -1){ 
-		(void)printf("ERROR: No se puede cambiar de directorio %s\n",argv[2]);
+		(void)printf("ERROR: Could not enter dir %s\n",argv[2]);
 		exit(4);
 	}
-    dg_open("webserver.log");
 	// Hacemos que el proceso sea un demonio sin hijos zombies
 	if(fork() != 0)
 		return 0; // El proceso padre devuelve un OK al shell
