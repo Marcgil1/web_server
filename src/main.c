@@ -20,17 +20,82 @@ struct {
 	char *ext;
 	char *filetype;
 } extensions [] = {
-	{"gif", "image/gif" },
-	{"jpg", "image/jpg" },
-	{"jpeg","image/jpeg"},
-	{"png", "image/png" },
-	{"ico", "image/ico" },
-	{"zip", "image/zip" },
-	{"gz",  "image/gz"  },
-	{"tar", "image/tar" },
-	{"htm", "text/html" },
-	{"html","text/html" },
+	{".gif", "image/gif" },
+	{".jpg", "image/jpg" },
+	{".jpeg","image/jpeg"},
+	{".png", "image/png" },
+	{".ico", "image/ico" },
+	{".zip", "image/zip" },
+	{".gz",  "image/gz"  },
+	{".tar", "image/tar" },
+	{".htm", "text/html" },
+	{".html","text/html" },
 	{0,0} };
+size_t len_extensions = 10;
+
+typedef enum _access_failure_t {
+    NULL_SIZE,
+    NULL_STRING,
+    ILLFORMED_URL,
+    NONEXISTENT_FILE,
+    PERMISSION_FAILURE,
+    INVALID_FILETYPE,
+} access_failure_t;
+
+int can_access_resource(char* path, size_t* type_idx, access_failure_t* err) {
+    if (err = NULL) {
+        return 0;
+    }
+    
+    if (type_idx == NULL) {
+        *err = NULL_SIZE;
+        return 0;
+    }
+
+    if (path == NULL) {
+        *err = NULL_STRING;
+        return 0;
+    }
+
+    if (path[0] != '/') {
+        dg_log(path);
+        *err = ILLFORMED_URL;
+        dg_log("3.2");
+        return 0;
+    }
+
+    char* resource;
+    if (strcmp(path, "/") == 0) {
+        resource = "index.html";
+    } else {
+        resource = path + 1;
+    }
+
+    int valid = 0;
+    for (*type_idx = 0; *type_idx < len_extensions && !valid; (*type_idx)++) {
+        valid = strstr(resource, extensions[*type_idx].ext)
+                == resource
+                   + strlen(resource)
+                   - strlen(extensions[*type_idx].ext);
+    }
+
+    if (!valid) {
+        *err = INVALID_FILETYPE;
+        return 0;
+    }
+    
+    if (access(resource, F_OK) != 0) {
+        *err = NONEXISTENT_FILE;
+        return 0;
+    }
+
+    if (access(resource, R_OK) != 0) {
+        *err = PERMISSION_FAILURE;
+        return 0;
+    }
+
+    return 1;
+}
 
 void process_web_request(int fd)
 {
@@ -39,87 +104,111 @@ void process_web_request(int fd)
     http_error_t err;
     http_req_t* req = http_read_request(fd, &err);
     if (req == NULL)
-        dg_log("The request could not be read");
+        dg_wrn("The request could not be read");
+    else
+        dg_log("The request colud be read");
 
     http_res_t* res;
+    size_t type_idx;
+    access_failure_t ft_err;
     if (req->method != GET) {
+        dg_wrn("The request was not a 'GET'");
         res = http_new_response("HTTP/1.1", 400, "Bad Request",
                                1, http_new_headers(1,
                                     "Connection", "close"),
                                 "");
         http_write_response(fd, res, &err);
+    } else if (!can_access_resource(req->url, &type_idx, &ft_err)) {
+        dg_wrn("The requested resource could not be read");
+        switch (ft_err) {
+            case ILLFORMED_URL:
+                res = http_new_response("HTTP/1.1", 400, "Bad Request",
+                                        1, http_new_headers(1,
+                                        "Connection", "close"),
+                                        "");
+                http_write_response(fd, res, &err);
+                break;
+            case NONEXISTENT_FILE:
+            case PERMISSION_FAILURE:
+            case INVALID_FILETYPE:
+                res = http_new_response("HTTP/1.1", 404, "Not Found",
+                                        1, http_new_headers(1,
+                                        "Connection", "close"),
+                                        "");
+                http_write_response(fd, res, &err);
+                break;
+            case NULL_SIZE:
+            case NULL_STRING:
+            default:
+                dg_err("Internal error");
+                exit(1);
+                break;
+        }
     } else {
-        char* url = "/index.html";
-        if (strcmp(req->url, "/") != 0) {
-            url = req->url;
+        dg_log("Request was OK");
+        char* url;
+        if (strcmp(req->url, "/") == 0) {
+            url = "index.html";
+        } else {
+            url = req->url + 1;
         }
 
-        if (access(url + 1, F_OK | R_OK) != 0) {
-            dg_log("Request tried to access a non-existent file");
-            res = http_new_response("HTTP/1.1", 404, "Not Found",
-                                    1, http_new_headers(1,
-                                        "Connection", "close"),
-                                    "");
-            http_write_response(fd, res, &err);
-        } else {
-            dg_log("Request was OK");
-            http_cookie_t* cookie = http_get_cookie(req, "cookie_counter");
-            if (cookie == NULL || atoi(cookie->value) < 10) {
-                char* new_counter = malloc(3);
-                if (new_counter == NULL) {
-                    dg_err("Memory error");
-                    exit(1);
-                }
-                sprintf(new_counter, "%d", (cookie == NULL) ? 1 : (atoi(cookie->value) + 1));
-                http_cookie_t* new_cookie = http_new_cookie(
-                        "cookie_counter", new_counter,
-                        1, 2*60);
-                char* new_cookie_str = http_cookie_to_string(new_cookie);
-                res = http_new_response("HTTP/1.1", 200, "OK",
-                        2, http_new_headers(2,
-                            "Connection", "close",
-                            "Set-Cookie", new_cookie_str),
-                        "");
+        http_cookie_t* cookie = http_get_cookie(req, "cookie_counter");
+        if (cookie == NULL || atoi(cookie->value) < 10) {
+            char* new_counter = malloc(3);
+            if (new_counter == NULL) {
+                dg_err("Memory error");
+                exit(1);
+            }
+            sprintf(new_counter, "%d", (cookie == NULL) ? 1 : (atoi(cookie->value) + 1));
+            http_cookie_t* new_cookie = http_new_cookie(
+                    "cookie_counter", new_counter,
+                    1, 2*60);
+            char* new_cookie_str = http_cookie_to_string(new_cookie);
+            res = http_new_response("HTTP/1.1", 200, "OK",
+                    2, http_new_headers(2,
+                        "Connection", "close",
+                        "Set-Cookie", new_cookie_str),
+                    "");
 
-                free(new_cookie_str);
-                http_drop_cookie(new_cookie);
-                http_drop_cookie(cookie);
-                int file_fd = open(url + 1, O_RDONLY, S_IRUSR);
-                if (file_fd == -1) {
-                    dg_err("Could not read file");
-                    close(fd);
-                    exit(1);
-                }
-
-                http_write_response(fd, res, &err);
-                ssize_t bytes_sent = 0;
-                off_t offset = 0;
-                do {
-                    bytes_sent = sendfile(fd, file_fd, &offset, 8000);
-                } while (bytes_sent > 0);
-                close(file_fd);
-            } else {
-                res = http_new_response("HTTP/1.1", 200, "OK",
-                        1, http_new_headers(1,
-                            "Connection", "close"),
-                        "");
-                int file_fd = open("error.html", O_RDONLY, S_IRUSR);
-                if (file_fd == -1) {
-                    dg_err("Could not read file");
-                    close(fd);
-                    exit(1);
-                }
-
-                http_write_response(fd, res, &err);
-                ssize_t bytes_sent = 0;
-                off_t offset = 0;
-                do {
-                    bytes_sent = sendfile(fd, file_fd, &offset, 8000);
-                } while (bytes_sent > 0);
-                close(file_fd);
+            free(new_cookie_str);
+            http_drop_cookie(new_cookie);
+            http_drop_cookie(cookie);
+            int file_fd = open(url, O_RDONLY, S_IRUSR);
+            if (file_fd == -1) {
+                dg_err("Could not read file");
+                close(fd);
+                exit(1);
             }
 
+            http_write_response(fd, res, &err);
+            ssize_t bytes_sent = 0;
+            off_t offset = 0;
+            do {
+                bytes_sent = sendfile(fd, file_fd, &offset, 8000);
+            } while (bytes_sent > 0);
+            close(file_fd);
+        } else {
+            res = http_new_response("HTTP/1.1", 200, "OK",
+                    1, http_new_headers(1,
+                        "Connection", "close"),
+                    "");
+            int file_fd = open("error.html", O_RDONLY, S_IRUSR);
+            if (file_fd == -1) {
+                dg_err("Could not read file");
+                close(fd);
+                exit(1);
+            }
+
+            http_write_response(fd, res, &err);
+            ssize_t bytes_sent = 0;
+            off_t offset = 0;
+            do {
+                bytes_sent = sendfile(fd, file_fd, &offset, 8000);
+            } while (bytes_sent > 0);
+            close(file_fd);
         }
+
     }
 
     http_drop_request(req);
