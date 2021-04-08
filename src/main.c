@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <sys/sendfile.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
@@ -79,6 +80,7 @@ int can_access_resource(char* path, size_t* type_idx, access_failure_t* err) {
                    + strlen(resource)
                    - strlen(extensions[*type_idx].ext);
     }
+    (*type_idx)--;
 
     if (!valid) {
         *err = INVALID_FILETYPE;
@@ -126,33 +128,39 @@ void process_web_request(int fd)
     if (req->method != GET) {
         dg_wrn("The request was not a 'GET'");
         res = http_new_response("HTTP/1.1", 400, "Bad Request",
-                               3, http_new_headers(3,
-                                    "Server",     "www.sstt58451049E.org",
-                                    "Date",       curr_time,
-                                    "Connection", "close"),
-                                "");
+                               5, http_new_headers(5,
+                                    "Server",           "www.sstt58451049E.org",
+                                    "Content-Type",     "text/html",
+                                    "Content-Length",   "74",
+                                    "Date",             curr_time,
+                                    "Connection",       "close"),
+                                "<html><body><p>Este servidor solo soporta peticiones GET</p></body></html>");
         http_write_response(fd, res, &err);
     } else if (!can_access_resource(req->url, &type_idx, &ft_err)) {
         dg_wrn("The requested resource could not be read");
         switch (ft_err) {
             case ILLFORMED_URL:
                 res = http_new_response("HTTP/1.1", 400, "Bad Request",
-                                        3, http_new_headers(3,
-                                            "Server",     "www.sstt58451049E.org",
-                                            "Date",       curr_time,
-                                            "Connection", "close"),
-                                        "");
+                                        5, http_new_headers(5,
+                                            "Server",           "www.sstt58451049E.org",
+                                            "Content-Type",     "text/html",
+                                            "Content-Length",   "47",
+                                            "Date",             curr_time,
+                                            "Connection",       "close"),
+                                        "<html><body><p>URL incorrecta</p></body></html>");
                 http_write_response(fd, res, &err);
                 break;
             case NONEXISTENT_FILE:
             case PERMISSION_FAILURE:
             case INVALID_FILETYPE:
                 res = http_new_response("HTTP/1.1", 404, "Not Found",
-                                        3, http_new_headers(3,
-                                            "Server",     "www.sstt58451049E.org",
-                                            "Date",       curr_time,
-                                            "Connection", "close"),
-                                        "");
+                                        5, http_new_headers(5,
+                                            "Server",           "www.sstt58451049E.org",
+                                            "Content-Type",     "text/html",
+                                            "Content-Length",   "56",
+                                            "Date",             curr_time,
+                                            "Connection",       "close"),
+                                        "<html><body><p>Documento no encontrado</p></body></html>");
                 http_write_response(fd, res, &err);
                 break;
             case NULL_SIZE:
@@ -183,24 +191,35 @@ void process_web_request(int fd)
                     "cookie_counter", new_counter,
                     1, 2*60);
             char* new_cookie_str = http_cookie_to_string(new_cookie);
-            res = http_new_response("HTTP/1.1", 200, "OK",
-                    5, http_new_headers(5,
-                        "Server",     "www.sstt58451049E.org",
-                        "Date",       curr_time,
-                        "Connection", "Keep-Alive",
-                        "Keep-Alive", "timeout=5, max=1000",
-                        "Set-Cookie", new_cookie_str),
-                    "");
 
-            free(new_cookie_str);
-            http_drop_cookie(new_cookie);
-            http_drop_cookie(cookie);
+            struct stat file_stat;
             int file_fd = open(url, O_RDONLY, S_IRUSR);
             if (file_fd == -1) {
                 dg_err("Could not read file");
                 close(fd);
                 exit(1);
             }
+            if (fstat(file_fd, &file_stat) == -1) {
+                dg_err("fstat");
+                exit(1);
+            }
+            char file_size_str[10];
+            sprintf(file_size_str, "%ld", file_stat.st_size);
+
+            res = http_new_response("HTTP/1.1", 200, "OK",
+                    7, http_new_headers(7,
+                        "Server",           "www.sstt58451049E.org",
+                        "Content-Type",     extensions[type_idx].filetype,
+                        "Content-Length",   file_size_str,
+                        "Date",             curr_time,
+                        "Connection",       "Keep-Alive",
+                        "Keep-Alive",       "timeout=5, max=1000",
+                        "Set-Cookie",       new_cookie_str),
+                    "");
+
+            free(new_cookie_str);
+            http_drop_cookie(new_cookie);
+            http_drop_cookie(cookie);
 
             http_write_response(fd, res, &err);
             ssize_t bytes_sent = 0;
@@ -210,28 +229,16 @@ void process_web_request(int fd)
             } while (bytes_sent > 0);
             close(file_fd);
         } else {
-            res = http_new_response("HTTP/1.1", 200, "OK",
-                    3, http_new_headers(3,
-                        "Server",     "www.sstt58451049E.org",
-                        "Date",       curr_time,
-                        "Connection", "close"),
-                    "");
-            int file_fd = open("error.html", O_RDONLY, S_IRUSR);
-            if (file_fd == -1) {
-                dg_err("Could not read file");
-                close(fd);
-                exit(1);
-            }
-
+            res = http_new_response("HTTP/1.1", 403, "Forbidden",
+                    5, http_new_headers(5,
+                        "Server",           "www.sstt58451049E.org",
+                        "Content-Type",     "text/http",
+                        "Content-Length",   "73",
+                        "Date",             curr_time,
+                        "Connection",       "close"),
+                    "<html><body><p>Has accedido al recurso demasiadas veces</p></body></html>");
             http_write_response(fd, res, &err);
-            ssize_t bytes_sent = 0;
-            off_t offset = 0;
-            do {
-                bytes_sent = sendfile(fd, file_fd, &offset, 8000);
-            } while (bytes_sent > 0);
-            close(file_fd);
         }
-
     }
 
     http_drop_request(req);
