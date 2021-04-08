@@ -1,3 +1,4 @@
+#include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -107,6 +108,17 @@ void process_web_request(int fd)
         dg_wrn("The request could not be read");
     else
         dg_log("The request colud be read");
+    char curr_time[200];
+    time_t     t   = time(NULL);
+    struct tm* tmp = localtime(&t);
+    if (tmp == NULL) {
+        dg_err("localtime");
+        exit(1);
+    }
+    if (strftime(curr_time, sizeof(curr_time), "%F", tmp) == 0) {
+        dg_err("strftime");
+        exit(1);
+    }
 
     http_res_t* res;
     size_t type_idx;
@@ -114,7 +126,9 @@ void process_web_request(int fd)
     if (req->method != GET) {
         dg_wrn("The request was not a 'GET'");
         res = http_new_response("HTTP/1.1", 400, "Bad Request",
-                               1, http_new_headers(1,
+                               3, http_new_headers(3,
+                                    "Server",     "www.sstt58451049E.org",
+                                    "Date",       curr_time,
                                     "Connection", "close"),
                                 "");
         http_write_response(fd, res, &err);
@@ -123,8 +137,10 @@ void process_web_request(int fd)
         switch (ft_err) {
             case ILLFORMED_URL:
                 res = http_new_response("HTTP/1.1", 400, "Bad Request",
-                                        1, http_new_headers(1,
-                                        "Connection", "close"),
+                                        3, http_new_headers(3,
+                                            "Server",     "www.sstt58451049E.org",
+                                            "Date",       curr_time,
+                                            "Connection", "close"),
                                         "");
                 http_write_response(fd, res, &err);
                 break;
@@ -132,8 +148,10 @@ void process_web_request(int fd)
             case PERMISSION_FAILURE:
             case INVALID_FILETYPE:
                 res = http_new_response("HTTP/1.1", 404, "Not Found",
-                                        1, http_new_headers(1,
-                                        "Connection", "close"),
+                                        3, http_new_headers(3,
+                                            "Server",     "www.sstt58451049E.org",
+                                            "Date",       curr_time,
+                                            "Connection", "close"),
                                         "");
                 http_write_response(fd, res, &err);
                 break;
@@ -166,8 +184,11 @@ void process_web_request(int fd)
                     1, 2*60);
             char* new_cookie_str = http_cookie_to_string(new_cookie);
             res = http_new_response("HTTP/1.1", 200, "OK",
-                    2, http_new_headers(2,
-                        "Connection", "close",
+                    5, http_new_headers(5,
+                        "Server",     "www.sstt58451049E.org",
+                        "Date",       curr_time,
+                        "Connection", "Keep-Alive",
+                        "Keep-Alive", "timeout=5, max=1000",
                         "Set-Cookie", new_cookie_str),
                     "");
 
@@ -190,7 +211,9 @@ void process_web_request(int fd)
             close(file_fd);
         } else {
             res = http_new_response("HTTP/1.1", 200, "OK",
-                    1, http_new_headers(1,
+                    3, http_new_headers(3,
+                        "Server",     "www.sstt58451049E.org",
+                        "Date",       curr_time,
                         "Connection", "close"),
                     "");
             int file_fd = open("error.html", O_RDONLY, S_IRUSR);
