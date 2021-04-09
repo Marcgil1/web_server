@@ -22,18 +22,20 @@ struct {
 	char *ext;
 	char *filetype;
 } extensions [] = {
-	{".gif", "image/gif" },
-	{".jpg", "image/jpg" },
-	{".jpeg","image/jpeg"},
-	{".png", "image/png" },
-	{".ico", "image/ico" },
-	{".zip", "image/zip" },
-	{".gz",  "image/gz"  },
-	{".tar", "image/tar" },
-	{".htm", "text/html" },
-	{".html","text/html" },
+	{".gif", "image/gif"              },
+	{".jpg", "image/jpg"              },
+	{".jpeg","image/jpeg"             },
+	{".png", "image/png"              },
+	{".ico", "image/ico"              },
+	{".zip", "image/zip"              },
+	{".gz",  "image/gz"               },
+	{".tar", "image/tar"              },
+	{".htm", "text/html"              },
+	{".html","text/html"              },
+    {".css", "text/css"               },
+    {".js",  "application/javascript" },
 	{0,0} };
-size_t len_extensions = 10;
+size_t len_extensions = 12;
 
 typedef enum _access_failure_t {
     NULL_SIZE,
@@ -368,7 +370,7 @@ int main(int argc, char **argv) {
                         tv.tv_sec  = 5;
                         tv.tv_usec = 0;
                     }
-                } while (select(1, &read_fd, NULL, NULL, &tv));
+                } while (select(socketfd+1, &read_fd, NULL, NULL, &tv));
 
                 (void)close(socketfd);
                 (void)exit(0);

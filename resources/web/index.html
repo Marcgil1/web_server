@@ -1,8 +1,10 @@
 <html>
     <head>
         <title>Servidor Simple para Servicios Telem&acute;ticos</title>
+        <link rel="shortcut icon" type="image/ico" href="/favicon.ico">
+        <link rel="stylesheet"    type="text/css"  href="/style.css">
     </head>
-    <body bgcolor="lightgray">
+    <body bgcolor="black">
         <h1>Esta es una pagina de prueba</h1>
 
         <img src="logo-um.jpg">
@@ -13,5 +15,32 @@
             <input type="text" name="email" value=""><br>
             <input type="submit" value="Enviar">
         </form>
+
+        <canvas class="background"></canvas>
+        <script src="/particles.js"></script>
+        <script>
+            window.onload = function() {
+                Particles.init({
+                    selector: '.background',
+                    color: '#18acb6',
+                    maxParticles: 130,
+                    connectParticles: true,
+                    articles: true,
+                    responsive: [
+                        {
+                            breakpoint: 768,
+                            options: {
+                                maxParticles: 80
+                            }
+                        }, {
+                            breakpoint: 375,
+                            options: {
+                                maxParticles: 50
+                            }
+                        }
+                    ]
+                });
+            };
+        </script>
     </body>
 </html>
