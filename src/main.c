@@ -100,9 +100,10 @@ int can_access_resource(char* path, size_t* type_idx, access_failure_t* err) {
     return 1;
 }
 
-void process_web_request(int fd)
+void process_web_request(int fd, int* keep_open)
 {
     dg_log("Processing a new request");
+    *keep_open = 1;
 
     http_error_t err;
     http_req_t* req = http_read_request(fd, &err);
@@ -110,6 +111,15 @@ void process_web_request(int fd)
         dg_wrn("The request could not be read");
     else
         dg_log("The request colud be read");
+
+
+    // Check whether the client would like to close the connection.
+    http_cookie_t* connection = http_get_cookie(req, "Connection");
+    if (connection != NULL && strcmp(connection->value, "close") == 0) {
+        *keep_open = 0;
+    }
+
+    // Set `curr_time` variable to hold a string representing the current time.
     char curr_time[200];
     time_t     t   = time(NULL);
     struct tm* tmp = localtime(&t);
@@ -181,6 +191,7 @@ void process_web_request(int fd)
 
         http_cookie_t* cookie = http_get_cookie(req, "cookie_counter");
         if (cookie == NULL || atoi(cookie->value) < 10) {
+            dg_log("Request was within visit limits");
             char* new_counter = malloc(3);
             if (new_counter == NULL) {
                 dg_err("Memory error");
@@ -229,6 +240,7 @@ void process_web_request(int fd)
             } while (bytes_sent > 0);
             close(file_fd);
         } else {
+            dg_wrn("Request was outside visit limits");
             res = http_new_response("HTTP/1.1", 403, "Forbidden",
                     5, http_new_headers(5,
                         "Server",           "www.sstt58451049E.org",
@@ -331,15 +343,18 @@ int main(int argc, char **argv) {
 
                 fd_set read_fd;
                 struct timeval tv;
+                int keep_open;
 
                 do  {
-                    process_web_request(socketfd); // El hijo termina tras llamar a esta función
+                    process_web_request(socketfd, &keep_open); // El hijo termina tras llamar a esta función
 
                     FD_ZERO(&read_fd);
-                    FD_SET(socketfd, &read_fd);
+                    if (keep_open) {
+                        FD_SET(socketfd, &read_fd);
 
-                    tv.tv_sec  = 5;
-                    tv.tv_usec = 0;
+                        tv.tv_sec  = 5;
+                        tv.tv_usec = 0;
+                    }
                 } while (select(1, &read_fd, NULL, NULL, &tv));
 
                 (void)close(socketfd);
