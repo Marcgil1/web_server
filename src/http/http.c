@@ -468,6 +468,43 @@ char* http_request_to_string(http_req_t* msg) {
     return NULL;
 }
 
+http_header_t* http_new_header(char* field_name, char* value) {
+    if (field_name == NULL || value == NULL)
+        return NULL;
+
+    http_header_t* ans = malloc(sizeof(http_header_t));
+    if (ans == NULL)
+        return NULL;
+
+    ans->field_name = strdup(field_name);
+    ans->value      = strdup(value);
+    if (ans->field_name == NULL || ans->value == NULL) {
+        http_drop_header(ans);
+        return NULL;
+    } else {
+        return ans;
+    }
+}
+
+void http_drop_header(http_header_t* header) {
+    if (header == NULL)
+        return;
+
+    free(header->field_name);
+    free(header->value);
+}
+
+http_header_t* http_get_header(http_req_t* msg, char* header) {
+    if (msg == NULL)
+        return NULL;
+
+    for (size_t i = 0; i < msg->num_headers; i++)
+        if (strcmp(msg->headers[i].field_name, header) == 0)
+            return http_new_header(header, msg->headers[i].value);
+
+    return NULL;
+}
+
 http_cookie_t* http_get_cookie(http_req_t* msg, char* cookie) {
     if (msg == NULL) {
         return NULL;

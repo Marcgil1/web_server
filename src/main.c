@@ -119,6 +119,9 @@ void process_web_request(int fd, int* keep_open)
         *keep_open = 0;
     }
 
+    // Check whether the client has included the `Host` header.
+    http_header_t* host = http_get_header(req, "Host");
+
     // Set `curr_time` variable to hold a string representing the current time.
     char curr_time[200];
     time_t     t   = time(NULL);
@@ -135,11 +138,21 @@ void process_web_request(int fd, int* keep_open)
     http_res_t* res;
     size_t type_idx;
     access_failure_t ft_err;
-    if (req->method != GET) {
+    if (host == NULL) {
+        dg_wrn("The request didn't include the Host header");
+        res = http_new_response("HTTP/1.1", 400, "Bad Request",
+                               4, http_new_headers(4,
+                                    "Content-Type",     "text/html",
+                                    "Content-Length",   "77",
+                                    "Date",             curr_time,
+                                    "Connection",       "close"),
+                                "<html><body><p>Toda petición debe incluir la cabecera Host</p></body></html>");
+        http_write_response(fd, res, &err);
+    } else if (req->method != GET) {
         dg_wrn("The request was not a 'GET'");
         res = http_new_response("HTTP/1.1", 400, "Bad Request",
                                5, http_new_headers(5,
-                                    "Server",           "www.sstt58451049E.org",
+                                    "Server",           host->value,
                                     "Content-Type",     "text/html",
                                     "Content-Length",   "74",
                                     "Date",             curr_time,
@@ -152,7 +165,7 @@ void process_web_request(int fd, int* keep_open)
             case ILLFORMED_URL:
                 res = http_new_response("HTTP/1.1", 400, "Bad Request",
                                         5, http_new_headers(5,
-                                            "Server",           "www.sstt58451049E.org",
+                                            "Server",           host->value,
                                             "Content-Type",     "text/html",
                                             "Content-Length",   "47",
                                             "Date",             curr_time,
@@ -165,7 +178,7 @@ void process_web_request(int fd, int* keep_open)
             case INVALID_FILETYPE:
                 res = http_new_response("HTTP/1.1", 404, "Not Found",
                                         5, http_new_headers(5,
-                                            "Server",           "www.sstt58451049E.org",
+                                            "Server",           host->value,
                                             "Content-Type",     "text/html",
                                             "Content-Length",   "56",
                                             "Date",             curr_time,
@@ -219,7 +232,7 @@ void process_web_request(int fd, int* keep_open)
 
             res = http_new_response("HTTP/1.1", 200, "OK",
                     7, http_new_headers(7,
-                        "Server",           "www.sstt58451049E.org",
+                        "Server",           host->value,
                         "Content-Type",     extensions[type_idx].filetype,
                         "Content-Length",   file_size_str,
                         "Date",             curr_time,
@@ -243,7 +256,7 @@ void process_web_request(int fd, int* keep_open)
             dg_wrn("Request was outside visit limits");
             res = http_new_response("HTTP/1.1", 403, "Forbidden",
                     5, http_new_headers(5,
-                        "Server",           "www.sstt58451049E.org",
+                        "Server",           host->value,
                         "Content-Type",     "text/http",
                         "Content-Length",   "73",
                         "Date",             curr_time,

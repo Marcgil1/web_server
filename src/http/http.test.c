@@ -370,6 +370,37 @@ void test_can_get_cookie2() {
     http_drop_request(msg);
 }
 
+void test_can_define_header() {
+    http_header_t* hdr = http_new_header("Connection", "Keep-Alive");
+
+    TEST_ASSERT_NOT_NULL(hdr);
+    TEST_ASSERT_NOT_NULL(hdr->field_name);
+    TEST_ASSERT_NOT_NULL(hdr->value);
+    TEST_ASSERT_EQUAL_STRING("Connection", hdr->field_name);
+    TEST_ASSERT_EQUAL_STRING("Keep-Alive", hdr->value);
+
+    http_drop_header(hdr);
+}
+
+void test_can_get_header() {
+    http_req_t* msg = http_new_request(GET, "/", "HTTP/1.1",
+                                       3, http_new_headers(3,
+                                           "Host", "www.abcd.eu",
+                                           "Cookie", "theme=light",
+                                           "Cookie", "token=1234"),
+                                       "");
+    http_header_t* hdr = http_get_header(msg, "Host");
+
+    TEST_ASSERT_NOT_NULL(hdr);
+    TEST_ASSERT_NOT_NULL(hdr->field_name);
+    TEST_ASSERT_NOT_NULL(hdr->value);
+    TEST_ASSERT_EQUAL_STRING("Host",        hdr->field_name);
+    TEST_ASSERT_EQUAL_STRING("www.abcd.eu", hdr->value);
+
+    http_drop_header(hdr);
+    http_drop_request(msg);
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_can_read_request_with_empty_url);
@@ -389,5 +420,7 @@ int main() {
     RUN_TEST(test_can_translate_response2);
     RUN_TEST(test_can_get_cookie1);
     RUN_TEST(test_can_get_cookie2);
+    RUN_TEST(test_can_define_header);
+    RUN_TEST(test_can_get_header);
     return UNITY_END();
 }
