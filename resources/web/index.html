@@ -1,46 +1,25 @@
 <html>
     <head>
         <title>Servidor Simple para Servicios Telem&acute;ticos</title>
-        <link rel="shortcut icon" type="image/ico" href="/favicon.ico">
+        <link rel="shortcut icon" type="image/png" href="/web.png">
         <link rel="stylesheet"    type="text/css"  href="/style.css">
     </head>
     <body bgcolor="black">
-        <h1>Esta es una pagina de prueba</h1>
-
-        <img src="logo-um.jpg">
-        <p>Caminante no hay camino, se hace camino al andar.</p>
-
-        <form method="POST" action="/accion_form.html">
-            Correo electr&oacute;nico:<br>
-            <input type="text" name="email" value=""><br>
-            <input type="submit" value="Enviar">
-        </form>
+        <div class="container" style="width: 350px; height: 80px">
+            <div style="float: left; width: 25%"><img style="width: 80px; height: 80px"src="web.png"></div>
+            <div style="float: left; width: 75%"><h1>Bienvenido</h1></div>
+        </div>
 
         <canvas class="background"></canvas>
         <script src="/particles.js"></script>
         <script>
-            window.onload = function() {
-                Particles.init({
-                    selector: '.background',
-                    color: '#18acb6',
-                    maxParticles: 130,
-                    connectParticles: true,
-                    articles: true,
-                    responsive: [
-                        {
-                            breakpoint: 768,
-                            options: {
-                                maxParticles: 80
-                            }
-                        }, {
-                            breakpoint: 375,
-                            options: {
-                                maxParticles: 50
-                            }
-                        }
-                    ]
-                });
-            };
+            var particles = Particles.init({
+                selector: '.background',
+                color: '#18acb6',
+                connectParticles: true,
+                speed: 0.5,
+                maxParticles: 150,
+            });
         </script>
     </body>
 </html>

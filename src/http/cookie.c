@@ -107,7 +107,6 @@ void http_drop_cookie(http_cookie_t* cookie) {
         return;
     }
 
-
     free(cookie->name);
     free(cookie->value);
     free(cookie);

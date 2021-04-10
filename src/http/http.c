@@ -1,4 +1,5 @@
 #include "http/http.h"
+#include "dg/debug.h"
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -14,7 +15,7 @@
 #define BUFSIZE 8096
 
 int __read_request(char* buffer, http_req_t* msg, http_error_t* error);
-int __read_headers(char* buffer, http_header_t** headers, unsigned* num_headers, http_error_t* error); 
+int __read_headers(char* buffer, http_header_t** headers, unsigned* num_headers, int fd, http_error_t* error); 
 int __read_body(char* buffer, http_req_t* msg, http_error_t* error); 
 
 http_req_t* http_read_request(int fd, http_error_t* error) {
@@ -30,8 +31,14 @@ http_req_t* http_read_request(int fd, http_error_t* error) {
         *error = SYSTEM_ERROR;
         return NULL;
     }
+    msg->method = 0;
+    msg->url = NULL;
+    msg->version = NULL;
+    msg->num_headers = 0;
+    msg->headers = NULL;
+    msg->body = 0;
 
-    bytes_read = recv(fd, buffer, BUFSIZE, 0);
+    bytes_read = read(fd, buffer, BUFSIZE);
 
     if (bytes_read == -1) {
         *error = FD_NOT_AVAILABLE;
@@ -47,7 +54,7 @@ http_req_t* http_read_request(int fd, http_error_t* error) {
     }
 
     start += ret;
-    ret = __read_headers(buffer + start, &(msg->headers), &(msg->num_headers), error);
+    ret = __read_headers(buffer + start, &(msg->headers), &(msg->num_headers), fd, error);
     if (ret < 0) {
         http_drop_request(msg);
         return NULL;
@@ -81,7 +88,7 @@ int __read_request(char* buffer, http_req_t* msg, http_error_t* error) {
     num_groups = 5;
     regi = regcomp(
         &reg_request,
-        "(GET|POST|HEAD|PUT|DELETE) (/|(/([[:alpha:]]|\.)+)+) (HTTP/[0-9]\.[0-9])\r\n",
+        "(GET|POST|HEAD|PUT|DELETE) (/|(/([[:alpha:]]|[[:alpha:]]\.)+)+) (HTTP/1\.1)\r\n",
         REG_EXTENDED);
     if (regi) {
         // Should never get here.
@@ -160,7 +167,7 @@ int __read_request(char* buffer, http_req_t* msg, http_error_t* error) {
 /* Checks how many lines in the buffer conform to the header line specification.
  * parse them and set `headers` and `num_headers` accordingly.
  */
-int __read_headers(char* buffer, http_header_t** headers, unsigned* num_headers, http_error_t* err) {
+int __read_headers(char* buffer, http_header_t** headers, unsigned* num_headers, int fd, http_error_t* err) {
     regex_t reg_header;
     unsigned num_groups = 4;
     regmatch_t pmatch[num_groups+1];
@@ -184,6 +191,10 @@ int __read_headers(char* buffer, http_header_t** headers, unsigned* num_headers,
         // Should never get here.
     }
 
+    if (strlen(buffer) == 0) {
+        read(fd, buffer, BUFSIZE);
+    }
+
     idx = 0;
     top = 0;
     while ((regi = regexec(&reg_header, buffer + top, num_groups+1, pmatch, 0))
@@ -192,7 +203,6 @@ int __read_headers(char* buffer, http_header_t** headers, unsigned* num_headers,
         len = pmatch[1].rm_eo - pmatch[1].rm_so;
         start = pmatch[1].rm_so;
         (*headers)[idx].field_name = malloc((len + 1) * sizeof(char));
-        // Must delete allocated memory!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         if ((*headers)[idx].field_name == NULL) {
             *err = SYSTEM_ERROR;
             return -2;
@@ -212,14 +222,23 @@ int __read_headers(char* buffer, http_header_t** headers, unsigned* num_headers,
 
         idx++;
         top += pmatch[0].rm_eo;
-        
+
+        if (strlen(buffer + top) == 0) {
+            read(fd, buffer + top, BUFSIZE - top);
+        }
+
+   
         
         if (idx == MAX_HEADERS) {
             *err = CORRUPTED_MESSAGE;
             return -4;
         }
     }
- 
+
+    if (strlen(buffer + top) == 0) {
+        read(fd, buffer + top, BUFSIZE - top);
+    }
+
     *num_headers = idx;
     if (strncmp(buffer + top, "\r\n", 2) != 0) {
         *err = CORRUPTED_MESSAGE;
@@ -492,6 +511,7 @@ void http_drop_header(http_header_t* header) {
 
     free(header->field_name);
     free(header->value);
+    free(header);
 }
 
 http_header_t* http_get_header(http_req_t* msg, char* header) {

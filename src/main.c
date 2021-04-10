@@ -37,67 +37,34 @@ struct {
 	{0,0} };
 size_t len_extensions = 12;
 
-typedef enum _access_failure_t {
-    NULL_SIZE,
-    NULL_STRING,
-    ILLFORMED_URL,
-    NONEXISTENT_FILE,
-    PERMISSION_FAILURE,
-    INVALID_FILETYPE,
-} access_failure_t;
-
-int can_access_resource(char* path, size_t* type_idx, access_failure_t* err) {
-    if (err = NULL) {
+int can_access_resource(char* path, size_t* type_idx) {
+    if (type_idx == NULL)
         return 0;
-    }
-    
-    if (type_idx == NULL) {
-        *err = NULL_SIZE;
+    if (path == NULL)
         return 0;
-    }
-
-    if (path == NULL) {
-        *err = NULL_STRING;
+    if (path[0] != '/')
         return 0;
-    }
-
-    if (path[0] != '/') {
-        dg_log(path);
-        *err = ILLFORMED_URL;
-        dg_log("3.2");
-        return 0;
-    }
 
     char* resource;
-    if (strcmp(path, "/") == 0) {
+    if (strcmp(path, "/") == 0)
         resource = "index.html";
-    } else {
+    else
         resource = path + 1;
-    }
 
     int valid = 0;
-    for (*type_idx = 0; *type_idx < len_extensions && !valid; (*type_idx)++) {
+    for (*type_idx = 0; *type_idx < len_extensions && !valid; (*type_idx)++)
         valid = strstr(resource, extensions[*type_idx].ext)
                 == resource
                    + strlen(resource)
                    - strlen(extensions[*type_idx].ext);
-    }
     (*type_idx)--;
 
-    if (!valid) {
-        *err = INVALID_FILETYPE;
+    if (!valid)
         return 0;
-    }
-    
-    if (access(resource, F_OK) != 0) {
-        *err = NONEXISTENT_FILE;
+    if (access(resource, F_OK) != 0)
         return 0;
-    }
-
-    if (access(resource, R_OK) != 0) {
-        *err = PERMISSION_FAILURE;
+    if (access(resource, R_OK) != 0)
         return 0;
-    }
 
     return 1;
 }
@@ -139,62 +106,37 @@ void process_web_request(int fd, int* keep_open)
 
     http_res_t* res;
     size_t type_idx;
-    access_failure_t ft_err;
-    if (host == NULL) {
-        dg_wrn("The request didn't include the Host header");
+    if (req == NULL || host == NULL) {
+        dg_wrn("Bad request");
         res = http_new_response("HTTP/1.1", 400, "Bad Request",
                                4, http_new_headers(4,
                                     "Content-Type",     "text/html",
-                                    "Content-Length",   "77",
+                                    "Content-Length",   "53",
                                     "Date",             curr_time,
                                     "Connection",       "close"),
-                                "<html><body><p>Toda petición debe incluir la cabecera Host</p></body></html>");
+                                "<html><body><p>Petición incorrecta</p></body></html>");
         http_write_response(fd, res, &err);
     } else if (req->method != GET) {
         dg_wrn("The request was not a 'GET'");
         res = http_new_response("HTTP/1.1", 400, "Bad Request",
                                5, http_new_headers(5,
-                                    "Server",           host->value,
+                                    "Server",           "web.st1049.org",
                                     "Content-Type",     "text/html",
                                     "Content-Length",   "74",
                                     "Date",             curr_time,
                                     "Connection",       "close"),
                                 "<html><body><p>Este servidor solo soporta peticiones GET</p></body></html>");
         http_write_response(fd, res, &err);
-    } else if (!can_access_resource(req->url, &type_idx, &ft_err)) {
-        dg_wrn("The requested resource could not be read");
-        switch (ft_err) {
-            case ILLFORMED_URL:
-                res = http_new_response("HTTP/1.1", 400, "Bad Request",
-                                        5, http_new_headers(5,
-                                            "Server",           host->value,
-                                            "Content-Type",     "text/html",
-                                            "Content-Length",   "47",
-                                            "Date",             curr_time,
-                                            "Connection",       "close"),
-                                        "<html><body><p>URL incorrecta</p></body></html>");
-                http_write_response(fd, res, &err);
-                break;
-            case NONEXISTENT_FILE:
-            case PERMISSION_FAILURE:
-            case INVALID_FILETYPE:
-                res = http_new_response("HTTP/1.1", 404, "Not Found",
-                                        5, http_new_headers(5,
-                                            "Server",           host->value,
-                                            "Content-Type",     "text/html",
-                                            "Content-Length",   "56",
-                                            "Date",             curr_time,
-                                            "Connection",       "close"),
-                                        "<html><body><p>Documento no encontrado</p></body></html>");
-                http_write_response(fd, res, &err);
-                break;
-            case NULL_SIZE:
-            case NULL_STRING:
-            default:
-                dg_err("Internal error");
-                exit(1);
-                break;
-        }
+    } else if (!can_access_resource(req->url, &type_idx)) {
+        res = http_new_response("HTTP/1.1", 404, "Not Found",
+                5, http_new_headers(5,
+                    "Server",           "web.st1049.org",
+                    "Content-Type",     "text/html",
+                    "Content-Length",   "56",
+                    "Date",             curr_time,
+                    "Connection",       "close"),
+                "<html><body><p>Documento no encontrado</p></body></html>");
+        http_write_response(fd, res, &err);
     } else {
         dg_log("Request was OK");
         char* url;
@@ -215,7 +157,7 @@ void process_web_request(int fd, int* keep_open)
             sprintf(new_counter, "%d", (cookie == NULL) ? 1 : (atoi(cookie->value) + 1));
             http_cookie_t* new_cookie = http_new_cookie(
                     "cookie_counter", new_counter,
-                    1, 2*60);
+                    1, 60);
             char* new_cookie_str = http_cookie_to_string(new_cookie);
 
             struct stat file_stat;
@@ -234,7 +176,7 @@ void process_web_request(int fd, int* keep_open)
 
             res = http_new_response("HTTP/1.1", 200, "OK",
                     7, http_new_headers(7,
-                        "Server",           host->value,
+                        "Server",           "web.st1049.org",
                         "Content-Type",     extensions[type_idx].filetype,
                         "Content-Length",   file_size_str,
                         "Date",             curr_time,
@@ -243,33 +185,35 @@ void process_web_request(int fd, int* keep_open)
                         "Set-Cookie",       new_cookie_str),
                     "");
 
-            free(new_cookie_str);
-            http_drop_cookie(new_cookie);
-            http_drop_cookie(cookie);
-
             http_write_response(fd, res, &err);
             ssize_t bytes_sent = 0;
             off_t offset = 0;
             do {
                 bytes_sent = sendfile(fd, file_fd, &offset, 8000);
+                usleep(1000);
             } while (bytes_sent > 0);
             close(file_fd);
+
+            free(new_cookie_str); new_cookie_str = NULL;
+            http_drop_cookie(new_cookie); new_cookie = NULL;
+            free(new_counter); new_counter = NULL;
         } else {
             dg_wrn("Request was outside visit limits");
             res = http_new_response("HTTP/1.1", 403, "Forbidden",
                     5, http_new_headers(5,
-                        "Server",           host->value,
+                        "Server",           "web.st1049.org",
                         "Content-Type",     "text/http",
                         "Content-Length",   "73",
                         "Date",             curr_time,
                         "Connection",       "close"),
-                    "<html><body><p>Has accedido al recurso demasiadas veces</p></body></html>");
+                    "<html0><body><p>Has accedido al recurso demasiadas veces</p></body></html>");
             http_write_response(fd, res, &err);
         }
+        http_drop_cookie(cookie); cookie = NULL;
     }
 
-    http_drop_request(req);
-    http_drop_response(res);
+    http_drop_request(req); req = NULL;
+    http_drop_response(res); res = NULL;
 	//	Evaluar el tipo de fichero que se está solicitando, y actuar en
 	//	consecuencia devolviendolo si se soporta u devolviendo el error correspondiente en otro caso
     dg_log("Finished handling request");
@@ -360,8 +304,13 @@ int main(int argc, char **argv) {
                 struct timeval tv;
                 int keep_open;
 
-                do  {
-                    process_web_request(socketfd, &keep_open); // El hijo termina tras llamar a esta función
+                FD_ZERO(&read_fd);
+                FD_SET(socketfd, &read_fd);
+                tv.tv_sec  = 5;
+                tv.tv_usec = 0;
+
+                while (select(socketfd+1, &read_fd, NULL, NULL, &tv)) {
+                    process_web_request(socketfd, &keep_open);
 
                     FD_ZERO(&read_fd);
                     if (keep_open) {
@@ -370,7 +319,7 @@ int main(int argc, char **argv) {
                         tv.tv_sec  = 5;
                         tv.tv_usec = 0;
                     }
-                } while (select(socketfd+1, &read_fd, NULL, NULL, &tv));
+                }
 
                 (void)close(socketfd);
                 (void)exit(0);
